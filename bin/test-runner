@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+"""
+Test ansible report runner
+"""
+
+import json
+
+from ansiblereporter.result import ReportRunnerError
+from ansiblereporter.cli import ReportScript
+
+script = ReportScript()
+script.add_argument('--json', action='store_true', help='Show results in json format')
+
+try:
+    args, results = script.run()
+except ReportRunnerError, emsg:
+    script.exit(1, emsg)
+
+# Example how to show results in stdout or json output
+if args.json:
+    script.message('%s' % json.dumps({'dark': results.dark, 'contacted': results.contacted}, indent=2))
+
+else:
+    for result in results.contacted:
+        script.message('%s' % (result.host))
+
+        if result.status == 'ok':
+            script.message('%s' % result.stdout)
+
+        else:
+            script.error('%s\n%s' % (result.stdout, result.stderr))
+
+    for result in results.dark:
+        script.error('%s unreachable' % result.host)
+
+# Example how to show a summary to debug output
+summary_fields = ('contacted', 'dark', 'ok', 'error', 'failed', 'unknown')
+summary = results.summary
+summary_string = ''
+for k in summary_fields:
+    summary_string += '%d %s, ' % (summary[k], k)
+script.log.debug(summary_string.strip(', '))
