@@ -6,37 +6,52 @@ Test ansible report runner
 import json
 
 from ansiblereporter.result import ReportRunnerError
-from ansiblereporter.cli import ReportScript
+from ansiblereporter.cli import ReportScript, create_directory
 
 script = ReportScript()
 script.add_argument('--json', action='store_true', help='Show results in json format')
+script.add_argument('--by-host', action='store_true', help='Store results to separate files')
+script.add_argument('--output-directory', help='Result output directory')
 
 try:
     args, results = script.run()
 except ReportRunnerError, emsg:
     script.exit(1, emsg)
 
-# Example how to show results in stdout or json output
-if args.json:
-    script.message('%s' % json.dumps({'dark': results.dark, 'contacted': results.contacted}, indent=2))
+if args.by_host and not args.output_directory:
+    script.exit(1, 'Argument --by-host requires output directory')
+
+if args.by_host:
+    try:
+        create_directory(args.output_directory)
+    except ReportRunnerError, emsg:
+        script.exit(1, emsg)
+
+    for result in results.contacted:
+        result.write_to_directory(args.output_directory, args.json)
 
 else:
-    for result in results.contacted:
-        script.message('%s' % (result.host))
+    # Example how to show results in stdout or json output
+    if args.json:
+        script.message('%s' % json.dumps({'dark': results.dark, 'contacted': results.contacted}, indent=2))
 
-        if result.status == 'ok':
-            script.message('%s' % result.stdout)
+    else:
+        for result in results.contacted:
+            script.message('%s' % (result.host))
 
-        else:
-            script.error('%s\n%s' % (result.stdout, result.stderr))
+            if result.status == 'ok':
+                script.message('%s' % result.stdout)
 
-    for result in results.dark:
-        script.error('%s unreachable' % result.host)
+            else:
+                script.error('%s\n%s' % (result.stdout, result.stderr))
 
-# Example how to show a summary to debug output
-summary_fields = ('contacted', 'dark', 'ok', 'error', 'failed', 'unknown')
-summary = results.summary
-summary_string = ''
-for k in summary_fields:
-    summary_string += '%d %s, ' % (summary[k], k)
-script.log.debug(summary_string.strip(', '))
+        for result in results.dark:
+            script.error('%s unreachable' % result.host)
+
+    # Example how to show a summary to debug output
+    summary_fields = ('contacted', 'dark', 'ok', 'error', 'failed', 'unknown')
+    summary = results.summary
+    summary_string = ''
+    for k in summary_fields:
+        summary_string += '%d %s, ' % (summary[k], k)
+    script.log.debug(summary_string.strip(', '))

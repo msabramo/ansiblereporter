@@ -2,8 +2,11 @@
 Ansible runner wrapper for output reporting tasks
 """
 
+import os
+import json
+
 from seine.address import IPv4Address
-from  ansible.runner import Runner
+from ansible.runner import Runner
 
 from ansiblereporter import SortedDict
 
@@ -14,6 +17,7 @@ class ReportRunnerError(Exception): pass
 class Result(SortedDict):
     compare_fields = ( 'resultset', 'address', 'host', )
     def __init__(self, resultset, host, data):
+        SortedDict.__init__(self)
         self.resultset = resultset
         self.host = host
 
@@ -50,6 +54,21 @@ class Result(SortedDict):
             return 'error'
 
         return 'unknown'
+
+    def write_to_directory(self, directory, to_json=False):
+        extension = to_json and 'json' or 'txt'
+        filename = os.path.join(directory, '%s.%s' % (self.host, extension))
+        self.log.debug('writing to %s' % filename)
+
+        if to_json:
+            open(filename, 'w').write('%s\n' % json.dumps({
+                'stdout': self.stdout,
+                'stderr': self.stderr
+                },
+                indent=2
+            ))
+        else:
+            open(filename, 'w').write('\n'.join([self.stdout, self.stderr]))
 
 class ResultSet(list):
     def __init__(self, runner, name):
@@ -112,4 +131,5 @@ class ReportRunner(Runner):
 
     def process_results(self, results):
         return RunnerResults(self, results)
+
 

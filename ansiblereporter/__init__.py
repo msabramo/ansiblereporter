@@ -1,6 +1,12 @@
 
+from systematic.log import Logger
+
 class SortedDict(dict):
     compare_fields = ()
+
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        self.log = Logger().default_stream
 
     def __cmp__(self, other):
         if self.compare_fields:

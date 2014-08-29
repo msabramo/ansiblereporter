@@ -7,6 +7,7 @@ import threading
 import getpass
 
 from systematic.shell import Script
+from systematic.log import Logger
 
 from ansible.constants import DEFAULT_MODULE_NAME, DEFAULT_MODULE_PATH, DEFAULT_MODULE_ARGS, \
                               DEFAULT_TIMEOUT, DEFAULT_HOST_LIST, DEFAULT_PRIVATE_KEY_FILE, \
@@ -15,6 +16,23 @@ from ansible.constants import DEFAULT_MODULE_NAME, DEFAULT_MODULE_PATH, DEFAULT_
 
 from ansible.errors import AnsibleError
 from ansiblereporter.result import ReportRunner, ReportRunnerError
+
+
+logger = Logger().default_stream
+
+
+def create_directory(directory):
+    if os.path.isdir(directory):
+        logger.debug('directory already exists: %s' % directory)
+        return
+
+    try:
+        os.makedirs(directory)
+    except IOError, (ecode, emsg):
+        raise ReportRunnerError('Error creating directory %s: %s' % (directory, emsg))
+    except OSError, (ecode, emsg):
+        raise ReportRunnerError('Error creating directory %s: %s' % (directory, emsg))
+
 
 class ReportScript(Script):
     def __init__(self, *args, **kwargs):
