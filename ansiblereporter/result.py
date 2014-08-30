@@ -37,6 +37,14 @@ class Result(SortedDict):
         return self.resultset.runner.show_colors
 
     @property
+    def returncode(self):
+        return 'rc' in self and self['rc'] or 0
+
+    @property
+    def error(self):
+        return 'msg' in self and self['msg'] or 'UNKNOWN ERROR'
+
+    @property
     def stdout(self):
         return 'stdout' in self and self['stdout'] or ''
 
@@ -49,7 +57,7 @@ class Result(SortedDict):
         return self.resultset.name
 
     @property
-    def chaned(self):
+    def changed(self):
         try:
             return self['changed']
         except KeyError:
@@ -87,6 +95,18 @@ class Result(SortedDict):
             return 'error'
 
         return 'unknown'
+
+    @property
+    def ansible_status(self):
+        if 'failed' in self:
+            return 'FAILED'
+
+        elif 'rc' in self:
+            if self['rc'] == 0:
+                return 'success'
+            return 'FAILED'
+
+        return 'UNKNOWN'
 
     def write_to_directory(self, directory, callback, extension):
         filename = os.path.join(directory, '%s.%s' % (self.host, extension))
@@ -171,6 +191,8 @@ class RunnerResults(list):
             fd.write('%s\n' % self.to_json())
         elif formatter:
             for result in self.contacted:
+                fd.write('%s\n' % formatter(result))
+            for result in self.dark:
                 fd.write('%s\n' % formatter(result))
 
         fd.close()

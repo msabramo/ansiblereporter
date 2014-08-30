@@ -22,22 +22,19 @@ from ansiblereporter.cli import ReportScript, create_directory
 def result_formatter(result):
     output = ''
 
-    if result.status == 'ok':
-        if result.show_colors:
-            output += colored(result, 'green')
+    if result.status in ( 'ok', 'error', 'unknown', ):
+        status = '%s | %s | rc=%d >>' % (result.host, result.ansible_status, result.returncode)
+        if result.returncode == 0:
+            output += colored(status, 'green')
         else:
-            output += '%s' % result
-        if result.stdout:
-            output += '\n%s' % result.stdout
+            output += colored(status, 'red')
+        output += colored('\n%s' % result.stdout)
 
     else:
-        if result.show_colors:
-            output += colored(result, 'red')
-        else:
-            output += '%s' % result
-
+        status = '%s | %s => %s' % (result.host, result.ansible_status, result.error)
+        output += colored(status, 'red')
         if result.stdout or result.stderr:
-            output += '\n%s\n%s' % (result.stdout, result.stderr)
+            output += colored('\n%s\n%s' % (result.stdout, result.stderr), 'red')
 
     return output
 
@@ -85,10 +82,11 @@ else:
 
     else:
         for result in results.contacted:
-            script.message(result.format(result_formatter))
+            script.message('%s\n' % result.format(result_formatter))
 
         for result in results.dark:
-            script.error(result.format(result_formatter))
+            script.error('%s\n' % result.format(result_formatter))
+
 
 summary_fields = ('contacted', 'dark', 'ok', 'error', 'failed', 'unknown')
 summary = results.summary
