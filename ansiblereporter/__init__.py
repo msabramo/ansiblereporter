@@ -1,6 +1,8 @@
 
 from systematic.log import Logger
 
+__version__ = '1.0'
+
 class SortedDict(dict):
     compare_fields = ()
 

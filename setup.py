@@ -23,6 +23,7 @@ setup(
     install_requires = (
         'systematic>=4.0.7',
         'seine>=2.4.2',
+        'termcolor',
     ),
 )
 

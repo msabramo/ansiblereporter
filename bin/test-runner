@@ -3,14 +3,52 @@
 Test ansible report runner
 """
 
-import json
+import os
+import sys
+from termcolor import colored, cprint
+
+try:
+    from ansiblereporter import __version__
+except ImportError:
+    BASE_DIR = os.sep.join(os.path.realpath(__file__).split(os.sep)[:-2])
+    moduledir = os.path.join(BASE_DIR, 'ansiblereporter')
+    if os.path.isdir(moduledir):
+        sys.path.insert(0, BASE_DIR)
+    from ansiblereporter import __version__
 
 from ansiblereporter.result import ReportRunnerError
 from ansiblereporter.cli import ReportScript, create_directory
 
+def result_formatter(result):
+    output = ''
+
+    if result.status == 'ok':
+        if result.show_colors:
+            output += colored(result, 'green')
+        else:
+            output += '%s' % result
+        if result.stdout:
+            output += '\n%s' % result.stdout
+
+    else:
+        if result.show_colors:
+            output += colored(result, 'red')
+        else:
+            output += '%s' % result
+
+        if result.stdout or result.stderr:
+            output += '\n%s\n%s' % (result.stdout, result.stderr)
+
+    return output
+
+def result_formatter_json(result):
+    return result.to_json()
+
+
 script = ReportScript()
 script.add_argument('--json', action='store_true', help='Show results in json format')
 script.add_argument('--by-host', action='store_true', help='Store results to separate files')
+script.add_argument('--output-file', help='Result output file')
 script.add_argument('--output-directory', help='Result output directory')
 
 try:
@@ -28,30 +66,34 @@ if args.by_host:
         script.exit(1, emsg)
 
     for result in results.contacted:
-        result.write_to_directory(args.output_directory, args.json)
+        if args.json:
+            result.write_to_directory(args.output_directory, result_formatter_json, 'json')
+        else:
+            result.write_to_directory(args.output_directory, result_formatter, 'txt')
+
+elif args.output_file:
+    try:
+        create_directory(os.path.dirname(args.output_file))
+    except ReportRunnerError, emsg:
+        script.exit(1, emsg)
+
+    results.write_to_file(args.output_file, formatter=result_formatter, json=args.json)
 
 else:
-    # Example how to show results in stdout or json output
     if args.json:
-        script.message('%s' % json.dumps({'dark': results.dark, 'contacted': results.contacted}, indent=2))
+        script.message('%s' % results.to_json())
 
     else:
         for result in results.contacted:
-            script.message('%s' % (result.host))
-
-            if result.status == 'ok':
-                script.message('%s' % result.stdout)
-
-            else:
-                script.error('%s\n%s' % (result.stdout, result.stderr))
+            script.message(result.format(result_formatter))
 
         for result in results.dark:
-            script.error('%s unreachable' % result.host)
+            script.error(result.format(result_formatter))
 
-    # Example how to show a summary to debug output
-    summary_fields = ('contacted', 'dark', 'ok', 'error', 'failed', 'unknown')
-    summary = results.summary
-    summary_string = ''
-    for k in summary_fields:
-        summary_string += '%d %s, ' % (summary[k], k)
-    script.log.debug(summary_string.strip(', '))
+summary_fields = ('contacted', 'dark', 'ok', 'error', 'failed', 'unknown')
+summary = results.summary
+summary_string = ''
+for k in summary_fields:
+    summary_string += '%d %s, ' % (summary[k], k)
+script.log.debug(summary_string.strip(', '))
+
