@@ -6,13 +6,13 @@ import os
 import json
 
 from datetime import datetime
+from ansible.playbook import PlayBook
 from ansible.runner import Runner
 from seine.address import IPv4Address
+from systematic.log import Logger
 
-from ansiblereporter import SortedDict
-
-
-class ReportRunnerError(Exception): pass
+from ansiblereporter import SortedDict, ReportRunnerError
+from ansiblereporter.reporter_callbacks import AggregateStats, PlaybookCallbacks, PlaybookRunnerCallbacks
 
 
 class Result(SortedDict):
@@ -35,6 +35,20 @@ class Result(SortedDict):
     @property
     def show_colors(self):
         return self.resultset.runner.show_colors
+
+    @property
+    def module_name(self):
+        try:
+            return self['invocation']['module_name']
+        except KeyError:
+            return ''
+
+    @property
+    def command(self):
+        try:
+            return self['invocation']['module_args']
+        except KeyError:
+            return ''
 
     @property
     def returncode(self):
@@ -62,6 +76,13 @@ class Result(SortedDict):
             return self['changed']
         except KeyError:
             return False
+
+    @property
+    def ansible_facts(self):
+        try:
+            return self.resultset.ansible_facts[self.host]
+        except KeyError:
+            return None
 
     @property
     def start(self):
@@ -94,6 +115,9 @@ class Result(SortedDict):
                 return 'ok'
             return 'error'
 
+        elif self.module_name == 'setup':
+            return 'facts'
+
         return 'unknown'
 
     @property
@@ -105,6 +129,9 @@ class Result(SortedDict):
             if self['rc'] == 0:
                 return 'success'
             return 'FAILED'
+
+        elif self.module_name == 'setup':
+            return 'FACTS'
 
         return 'UNKNOWN'
 
@@ -123,62 +150,39 @@ class Result(SortedDict):
 
 class ResultSet(list):
     def __init__(self, runner, name):
+        self.log = Logger().default_stream
         self.runner = runner
         self.name = name
-
-    def __cmp__(self, other):
-        return cmp(self.name, other.name)
-
-    def __repr__(self):
-        return 'result group %s' % self.name
+        self.ansible_facts = {}
 
     def append(self, host, result):
         list.append(self, Result(self, host, result))
+        if 'ansible_facts' in result:
+            self.ansible_facts[host] = result['ansible_facts']
 
     def to_json(self, indent=2):
         return json.dumps(self, indent=indent)
 
-class RunnerResults(list):
-    def __init__(self, runner, results, show_colors=False):
+
+class ResultList(object):
+    def __init__(self, runner, show_colors=False):
         self.runner = runner
         self.show_colors = show_colors
+        self.log = Logger().default_stream
 
-        for k in ( 'dark', 'contacted', ):
-            if k in results:
-                group = ResultSet(self, k)
-                setattr(self, k, group)
-
-                for host, result in results[k].items():
-                    group.append(host, result)
-
-            else:
-                setattr(self, k, [])
-
-    @property
-    def summary(self):
-        summary = {
-            'dark': len(self.dark),
-            'contacted': len(self.contacted),
-            'ok': 0,
-            'error': 0,
-            'failed': 0,
-            'unknown': 0,
+        self.results = {
+            'contacted': ResultSet(self, 'contacted'),
+            'dark': ResultSet(self, 'dark'),
         }
-        for c in self.contacted:
-            try:
-                summary[c.status] += 1
-            except KeyError:
-                summary['unknown'] += 1
-        return summary
 
     def sort(self):
-        self.dark.sort()
-        self.contacted.sort()
+        self.results['dark'].sort()
+        self.results['contacted'].sort()
 
     def to_json(self, indent=2):
         return json.dumps({
-                'contacted': self.contacted,
-                'dark': self.dark,
+                'contacted': self.results['contacted'],
+                'dark': self.results['dark'],
             },
             indent=indent
         )
@@ -190,9 +194,82 @@ class RunnerResults(list):
         if json:
             fd.write('%s\n' % self.to_json())
         elif formatter:
-            for result in self.contacted:
+            for result in self.results['contacted']:
                 fd.write('%s\n' % formatter(result))
-            for result in self.dark:
+            for result in self.results['dark']:
+                fd.write('%s\n' % formatter(result))
+
+        fd.close()
+
+
+class RunnerResults(ResultList):
+    def __init__(self, runner, results, show_colors=False):
+        ResultList.__init__(self, runner, show_colors)
+
+        for k in ( 'dark', 'contacted', ):
+            if k in results:
+                group = self.results[k]
+                for host, result in results[k].items():
+                    group.append(host, result)
+
+class PlaybookResults(ResultList, AggregateStats):
+    def __init__(self, runner, show_colors=False):
+        AggregateStats.__init__(self)
+        ResultList.__init__(self, runner, show_colors)
+
+    def _increment(self, what, host):
+        ''' helper function to bump a statistic '''
+        self.processed[host] = 1
+        prev = (getattr(self, what)).get(host, 0)
+        getattr(self, what)[host] = prev+1
+
+    def compute(self, runner_results, setup=False, poll=False, ignore_errors=False):
+        for (host, value) in runner_results.get('contacted', {}).iteritems():
+            self.results['contacted'].append(host, value)
+
+        for (host, value) in runner_results.get('dark', {}).iteritems():
+            self.results['dark'].append(host, value)
+
+    def summarize(self, host):
+        """
+
+        """
+        return {
+            'contacted': self.results['contacted'],
+            'dark': self.results['dark'],
+        }
+
+    def to_json(self, indent=2):
+        data = { 'contacted': [], 'dark': [] }
+        res = {}
+        for result in self.results['contacted']:
+            if result.host not in res:
+                res[result.host] = {'host': result.host, 'results': []}
+
+            if result.module_name == 'setup' and not self.runner.show_facts:
+                continue
+
+            res[result.host]['results'].append(result.copy())
+
+        for key in sorted(res.keys()):
+            data['contacted'].append(res[key])
+
+        return json.dumps(data, indent=indent)
+
+    def write_to_file(self, filename, formatter=None, json=False):
+        if not formatter and not json:
+            raise ReportRunnerError('Either formatter callback or json flag must be set')
+        fd = open(filename, 'w')
+        if json:
+            fd.write('%s\n' % self.to_json())
+        elif formatter:
+            for result in self.results['contacted']:
+                if result.module_name == 'setup' and not self.runner.show_facts:
+                    continue
+                fd.write('%s\n' % formatter(result))
+            for result in self.results['dark']:
+                if result.module_name == 'setup' and not self.runner.show_facts:
+                    continue
                 fd.write('%s\n' % formatter(result))
 
         fd.close()
@@ -211,3 +288,24 @@ class ReportRunner(Runner):
         return RunnerResults(self, results, show_colors)
 
 
+class PlaybookRunner(PlayBook):
+    def __init__(self, *args, **kwargs):
+        self.show_colors = kwargs.pop('show_colors', False)
+        self.show_facts = kwargs.pop('show_facts', False)
+
+        self.results = PlaybookResults(self, self.show_colors)
+        self.callbacks = PlaybookCallbacks()
+        self.runner_callbacks = PlaybookRunnerCallbacks(self.results)
+
+        kwargs['callbacks'] =self.callbacks
+        kwargs['runner_callbacks'] = self.runner_callbacks
+        kwargs['stats'] = self.results
+        PlayBook.__init__(self, *args, **kwargs)
+
+    def run(self, *args, **kwargs):
+        stats = PlayBook.run(self, *args, **kwargs)
+        return self.process_results(self.results)
+
+    def process_results(self, results):
+        self.results.sort()
+        return self.results

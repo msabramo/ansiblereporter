@@ -17,13 +17,13 @@ except ImportError:
     from ansiblereporter import __version__
 
 from ansiblereporter import ReportRunnerError
-from ansiblereporter.cli import RunnerScript, create_directory
+from ansiblereporter.cli import PlaybookScript, create_directory
 
-def result_formatter(result):
+def result_formatter(result,):
     output = ''
 
     if result.status in ( 'ok', 'error', 'unknown', ):
-        status = '%s | %s | rc=%d >>' % (result.host, result.ansible_status, result.returncode)
+        status = '%s | %s | %s | %s' % (result.host, result.ansible_status, result.returncode, result.command)
         if result.returncode == 0:
             color = 'green'
         else:
@@ -31,8 +31,13 @@ def result_formatter(result):
         output += colored(status, color)
         output += colored('\n%s' % result.stdout, color)
 
+    elif result.status == 'facts':
+        output += colored('%s | %s | %s | %s' % (result.host, result.ansible_status, result.returncode, result.command), 'cyan')
+        for key, value in result.ansible_facts.items():
+            output += colored('\n  %s %s' % (key, value), 'cyan')
+
     else:
-        status = '%s | %s => %s' % (result.host, result.ansible_status, result.error)
+        status = '%s | %s | %s | %s' % (result.host, result.ansible_status, result.error, result.command)
         output += colored(status, 'red')
         if result.stdout or result.stderr:
             output += colored('\n%s\n%s' % (result.stdout, result.stderr), 'red')
@@ -43,7 +48,7 @@ def result_formatter_json(result):
     return result.to_json()
 
 
-script = RunnerScript()
+script = PlaybookScript()
 script.add_argument('--json', action='store_true', help='Show results in json format')
 script.add_argument('--by-host', action='store_true', help='Store results to separate files')
 script.add_argument('--output-file', help='Result output file')
@@ -83,9 +88,13 @@ else:
 
     else:
         for result in data.results['contacted']:
+            if result.module_name == 'setup' and not args.show_facts:
+                continue
             script.message('%s\n' % result.format(result_formatter))
 
         for result in data.results['dark']:
+            if result.module_name == 'setup' and not args.show_facts:
+                continue
             script.error('%s\n' % result.format(result_formatter))
 
 

@@ -1,0 +1,13 @@
+
+- name: Test playbook
+  hosts: all
+  user: hile
+  gather_facts: true
+
+  tasks:
+
+  - name: Check uname
+    command: uname -m
+
+  - name: Run false
+    command: ls

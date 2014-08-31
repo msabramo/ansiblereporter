@@ -3,6 +3,10 @@ from systematic.log import Logger
 
 __version__ = '1.0'
 
+
+class ReportRunnerError(Exception): pass
+
+
 class SortedDict(dict):
     compare_fields = ()
 
@@ -13,11 +17,10 @@ class SortedDict(dict):
     def __cmp__(self, other):
         if self.compare_fields:
             for key in self.compare_fields:
-                a = getattr(key, self)
-                b = getattr(key, other)
+                a = getattr(self, key)
+                b = getattr(other, key)
                 if a != b:
                     return cmp(a, b)
-
             return 0
 
         else:
