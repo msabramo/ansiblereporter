@@ -1,0 +1,21 @@
+#
+# Install OS updates to debian based hosts
+#
+#
+
+- name: Update debian OS
+  hosts: debian
+
+  tasks:
+  - name: ping hosts
+    ping:
+
+  - name: Update apt cache
+    shell: sudo apt-get -qq update
+
+  - name: Upgrade packages
+    shell: sudo apt-get -y upgrade
+
+  - name: Clean apt caches
+    shell: sudo apt-get clean
+

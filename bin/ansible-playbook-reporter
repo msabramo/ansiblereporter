@@ -28,8 +28,10 @@ def result_formatter(result,):
             color = 'green'
         else:
             color = 'red'
-        output += colored(status, color)
-        output += colored('\n%s' % result.stdout, color)
+
+        output += colored('%s' % status, color)
+        if result.stdout:
+            output += colored('\n%s' % result.stdout, color)
 
     elif result.status == 'facts':
         output += colored('%s | %s | %s | %s' % (result.host, result.ansible_status, result.returncode, result.command), 'cyan')

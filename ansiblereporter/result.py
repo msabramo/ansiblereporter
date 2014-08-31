@@ -22,6 +22,8 @@ class Result(SortedDict):
         self.resultset = resultset
         self.host = host
 
+        self.__cached_properties__ = {}
+
         try:
             self.address = IPv4Address(host)
         except ValueError:
@@ -32,108 +34,154 @@ class Result(SortedDict):
     def __repr__(self):
         return ' '.join([self.host, self.status, self.end])
 
+    def __set_cached_property__(self, key, value):
+        self.__cached_properties__[key] = value
+
+    def __get_cached_property__(self, key):
+        return self.__cached_properties__.get(key, None)
+
+    def __get_datetime_property__(self, key):
+        cached = self.__get_cached_property__(key)
+        if cached:
+            return cached
+
+        value = self.get(key, None)
+        if value is not None:
+            try:
+                value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                raise ReportRunnerError('Error parsing %w date value %s' (key, value))
+        else:
+            return None
+
+        self.__set_cached_property__(key, value)
+        return value
+
     @property
     def show_colors(self):
         return self.resultset.runner.show_colors
 
     @property
-    def module_name(self):
-        try:
-            return self['invocation']['module_name']
-        except KeyError:
-            return ''
-
-    @property
-    def command(self):
-        try:
-            return self['invocation']['module_args']
-        except KeyError:
-            return ''
+    def changed(self):
+        return self.get('changed', False)
 
     @property
     def returncode(self):
-        return 'rc' in self and self['rc'] or 0
+        return self.get('rc', 0)
 
     @property
     def error(self):
-        return 'msg' in self and self['msg'] or 'UNKNOWN ERROR'
+        return self.get('msg', 'UNKNOWN ERROR')
 
     @property
     def stdout(self):
-        return 'stdout' in self and self['stdout'] or ''
+        return self.get('stdout', '')
 
     @property
     def stderr(self):
-        return 'stderr' in self and self['stderr'] or ''
+        return self.get('stderr', '')
 
     @property
     def state(self):
         return self.resultset.name
 
     @property
-    def changed(self):
-        try:
-            return self['changed']
-        except KeyError:
-            return False
-
-    @property
     def ansible_facts(self):
-        try:
-            return self.resultset.ansible_facts[self.host]
-        except KeyError:
-            return None
+        return self.resultset.ansible_facts.get(self.host, None)
 
     @property
     def start(self):
-        try:
-            return datetime.strptime(self['start'], '%Y-%m-%d %H:%M:%S.%f').strftime('%Y-%m-%d %H:%M:%S')
-        except KeyError:
-            return ''
+        return self.__get_datetime_property__('start')
 
     @property
     def end(self):
-        try:
-            return datetime.strptime(self['end'], '%Y-%m-%d %H:%M:%S.%f').strftime('%Y-%m-%d %H:%M:%S')
-        except KeyError:
-            return ''
+        return self.__get_datetime_property__('end')
 
     @property
     def delta(self):
+        return self.__get_datetime_property__('ens')
+
+    @property
+    def module_name(self):
+        cached = self.__get_cached_property__('module_name')
+        if cached:
+            return cached
+
         try:
-            return datetime.strptime(self['delta'], '%Y-%m-%d %H:%M:%S.%f').strftime('%Y-%m-%d %H:%M:%S')
+            value = self['invocation']['module_name']
         except KeyError:
             return ''
 
+        self.__set_cached_property__('module_name', value)
+        return value
+
+    @property
+    def module_args(self):
+        cached = self.__get_cached_property__('module_args')
+        if cached:
+            return cached
+
+        try:
+            value = self['invocation']['module_args']
+        except KeyError:
+            return ''
+
+        self.__set_cached_property__('module_args', value)
+        return value
+
+    @property
+    def command(self):
+        cached = self.__get_cached_property__('command')
+        if cached:
+            return cached
+
+        if self.module_name in ( 'command', 'shell' ):
+            try:
+                value = self['invocation']['module_args']
+            except KeyError:
+                return ''
+        else:
+            value = self.module_name
+
+        self.__set_cached_property__('command', value)
+        return value
+
     @property
     def status(self):
+        cached = self.__get_cached_property__('status')
+        if cached:
+            return cached
+
         if 'failed' in self:
-            return 'failed'
+            value = 'failed'
 
         elif 'rc' in self:
-            if self['rc'] == 0:
-                return 'ok'
-            return 'error'
+            if self.get('rc', 0) == 0:
+                value = 'ok'
+            else:
+                value = 'error'
+
+        elif self.module_name == 'ping':
+            value = self.get('ping', False) and 'ok' or False
 
         elif self.module_name == 'setup':
-            return 'facts'
+            if self.get('ansible_facts', None):
+                value = 'facts'
+            else:
+                return 'pending'
 
-        return 'unknown'
+        self.__set_cached_property__('status', value)
+        return value
 
     @property
     def ansible_status(self):
-        if 'failed' in self:
+        if self.status == 'ok':
+            return 'sucecss'
+
+        elif self.status in ( 'failed', 'error', ):
             return 'FAILED'
 
-        elif 'rc' in self:
-            if self['rc'] == 0:
-                return 'success'
-            return 'FAILED'
-
-        elif self.module_name == 'setup':
-            return 'FACTS'
-
-        return 'UNKNOWN'
+        return self.status
 
     def write_to_directory(self, directory, callback, extension):
         filename = os.path.join(directory, '%s.%s' % (self.host, extension))
@@ -251,8 +299,22 @@ class PlaybookResults(ResultList, AggregateStats):
 
             res[result.host]['results'].append(result.copy())
 
+
         for key in sorted(res.keys()):
             data['contacted'].append(res[key])
+
+        res = {}
+        for result in self.results['dark']:
+            if result.host not in res:
+                res[result.host] = {'host': result.host, 'results': []}
+
+            if result.module_name == 'setup' and not self.runner.show_facts:
+                continue
+
+            res[result.host]['results'].append(result.copy())
+
+        for key in sorted(res.keys()):
+            data['dark  '].append(res[key])
 
         return json.dumps(data, indent=indent)
 

@@ -21,6 +21,7 @@ from ansiblereporter import ReportRunnerError
 from ansiblereporter.result import PlaybookRunner, ReportRunner, ReportRunnerError
 
 DEFAULT_INVENTORY_PATHS = (
+    os.environ.get('ANSIBLE_HOSTS', None),
     os.path.expanduser('~/.ansible.hosts'),
     DEFAULT_HOST_LIST,
 )
@@ -31,6 +32,9 @@ logger = Logger().default_stream
 
 def find_inventory():
     for hostlist in DEFAULT_INVENTORY_PATHS:
+        if hostlist is None:
+            continue
+
         if os.path.isfile(hostlist):
             return hostlist
 

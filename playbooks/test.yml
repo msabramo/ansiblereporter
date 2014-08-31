@@ -6,8 +6,6 @@
 
   tasks:
 
-  - name: Check uname
-    command: uname -m
+  - name: Ping host
+    ping:
 
-  - name: Run false
-    command: ls
