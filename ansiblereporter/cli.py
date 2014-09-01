@@ -1,5 +1,7 @@
-"""
-Wrap systematic's Script to run ansible commands
+"""Script wrappers for ansible commands and PlaybookScript
+
+Wrap calling of ansible commands and playbooks to a script, extending
+systematic.shell.Script classes.
 """
 
 import os
@@ -31,6 +33,11 @@ logger = Logger().default_stream
 
 
 def find_inventory():
+    """Locate ansible inventory
+
+    Return first ansible inventory file matching paths in
+    DEFAULT_INVENTORY_PATHS.
+    """
     for hostlist in DEFAULT_INVENTORY_PATHS:
         if hostlist is None:
             continue
@@ -42,6 +49,12 @@ def find_inventory():
 
 
 def create_directory(directory):
+    """Create directory
+
+    Wrapper to attempt creating directory unless it exists.
+
+    Raises ReportRunnerError if any errors happen.
+    """
     if os.path.isdir(directory):
         logger.debug('directory already exists: %s' % directory)
         return
@@ -55,6 +68,12 @@ def create_directory(directory):
 
 
 class AnsibleScript(Script):
+    """Ansible script wrapper base class
+
+    Extend systematic.shell.Script (which wraps argparse.ArgumentParser) to run ansible
+    and playbook commands. This is just the base class for variants.
+    """
+
     def __init__(self, *args, **kwargs):
         Script.__init__(self, *args, **kwargs)
         self.runner = None
@@ -97,6 +116,13 @@ class AnsibleScript(Script):
 
 
 class RunnerScript(AnsibleScript):
+    """Ansible script wrapper
+
+    Extend systematic.shell.Script (which wraps argparse.ArgumentParser) to run ansible
+    commands with reports.
+    """
+    runner_class = ReportRunner
+
     def __init__(self, *args, **kwargs):
         AnsibleScript.__init__(self, *args, **kwargs)
 
@@ -118,10 +144,14 @@ class RunnerScript(AnsibleScript):
         self.add_argument('pattern', default=DEFAULT_PATTERN, help='Ansible host pattern')
 
     def run(self):
+        """Parse arguments and run ansible command
+
+        Parse provided arguments and run the ansible command with ansiblereporter.result.ReportRunner.run()
+        """
         args = self.parse_args()
 
         self.log.debug('runner with %s%s args %s' % (self.mode, args.module, args.args))
-        self.runner = ReportRunner(
+        self.runner = self.runner_class(
             host_list=os.path.realpath(args.inventory),
             module_path=args.module_path,
             module_name=args.module,
@@ -147,6 +177,13 @@ class RunnerScript(AnsibleScript):
 
 
 class PlaybookScript(AnsibleScript):
+    """Playbook runner wrapper
+
+    Extend systematic.shell.Script (which wraps argparse.ArgumentParser) to run ansible
+    playbooks with reports.
+    """
+    runner_class = PlaybookRunner
+
     def __init__(self, *args, **kwargs):
         AnsibleScript.__init__(self, *args, **kwargs)
 
@@ -168,9 +205,13 @@ class PlaybookScript(AnsibleScript):
         self.add_argument('playbook', help='Ansible playbook path')
 
     def run(self):
+        """Parse arguments and run playbook
+
+        Parse provided arguments and run the playbook with ansiblereporter.result.PlaybookRunner.run()
+        """
         args = self.parse_args()
 
-        self.runner = PlaybookRunner(
+        self.runner = self.runner_class(
             playbook=args.playbook,
             host_list=os.path.realpath(args.inventory),
             module_path=args.module_path,

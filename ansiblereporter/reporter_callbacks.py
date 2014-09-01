@@ -1,3 +1,11 @@
+"""
+Custom callbacks
+
+These callbacks override the chatty behaviour of default ansible playbook
+callbacks, allowing us to collect the info and only log the progress to
+debug logging.
+"""
+
 
 from ansible import utils
 from ansible import callbacks
@@ -9,6 +17,12 @@ AggregateStats = callbacks.AggregateStats
 
 
 class PlaybookRunnerCallbacks(callbacks.PlaybookRunnerCallbacks):
+    """Playbook runner callbacks
+
+    Override version of ansible.callbacks.PlaybookRunnerCallbacks that
+    only logs to default logger with debug messages, not actually doing
+    anything else.
+    """
     def __init__(self, stats, verbose=None):
         callbacks.PlaybookRunnerCallbacks.__init__(self, stats, verbose)
         self.log = Logger().default_stream
@@ -42,6 +56,15 @@ class PlaybookRunnerCallbacks(callbacks.PlaybookRunnerCallbacks):
 
 
 class PlaybookCallbacks(callbacks.PlaybookCallbacks):
+    """Playbook callbacks
+
+    Override version of ansible.callbacks.PlaybookCallbacks that only logs
+    to default logger with debug messages, not actually doing anything else.
+
+    Please note that callback on_vars_prompt is NOT overridden, so if your
+    code asks for variables we will use the standard chatty query version!
+    """
+
     def __init__(self, verbose=False):
         callbacks.PlaybookCallbacks.__init__(self, verbose)
         self.log = Logger().default_stream

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test ansible report runner
+Run ansible runner with custom outputs
 """
 
 import os

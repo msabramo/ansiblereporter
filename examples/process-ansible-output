@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+"""
+Example how to write custom output processor for ansible output data.
+
+This example is for a single ansible command. Same processor rules can be used
+with playbooks.
+
+The example removes any lines starting with # from the stdout of tasks.
+
+The example filter shows how to chain custom loader classes for all parts of the
+reporter, how to parse custom result entry somehow and how to use process_results
+in the result runner.
+
+Please note that normally you don't need to replace the whole stack like here, just
+implement whatever you need in the customized ReportRunner.process_results method.
+"""
+
+import os
+import sys
+
+try:
+    from ansiblereporter import __version__
+except ImportError:
+    BASE_DIR = os.sep.join(os.path.realpath(__file__).split(os.sep)[:-2])
+    moduledir = os.path.join(BASE_DIR, 'ansiblereporter')
+    if os.path.isdir(moduledir):
+        sys.path.insert(0, BASE_DIR)
+    from ansiblereporter import __version__
+
+from ansiblereporter import ReportRunnerError
+from ansiblereporter.cli import RunnerScript, create_directory
+
+from ansiblereporter.result import ReportRunner, RunnerResults, ResultList, ResultSet, Result
+
+class CustomResult(Result):
+    def __init__(self, *args, **kwargs):
+        Result.__init__(self, *args, **kwargs)
+
+        self.filtered_lines = []
+        for l in self.stdout.splitlines():
+            if l.startswith('#'):
+                continue
+            self.filtered_lines.append(l)
+
+    def __repr__(self):
+        return 'custom result %s' % Result.__repr__(self)
+
+class CustomResultSet(ResultSet):
+    result_loader = CustomResult
+
+class CustomResults(RunnerResults):
+    resultset_loader = CustomResultSet
+
+class CustomRunner(ReportRunner):
+    results_loader = CustomResults
+
+    def process_results(self, results, show_colors=False):
+        data = self.results_loader(self, results, show_colors)
+
+        # Do something here for the loaded CustomResults entries
+        for r in data.results['contacted']:
+            pass
+
+        for r in data.results['dark']:
+            pass
+
+        return data
+
+class CustomScript(RunnerScript):
+    runner_class = CustomRunner
+
+script = CustomScript()
+
+try:
+    args, data = script.run()
+except ReportRunnerError, emsg:
+    script.exit(1, emsg)
+
+for r in data.results['contacted']:
+    print r.state, r, type(r)
+    for l in r.filtered_lines:
+        print l
+
