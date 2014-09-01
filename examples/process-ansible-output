@@ -46,13 +46,15 @@ class CustomResult(Result):
         return 'custom result %s' % Result.__repr__(self)
 
 class CustomResultSet(ResultSet):
-    result_loader = CustomResult
+    pass
 
 class CustomResults(RunnerResults):
-    resultset_loader = CustomResultSet
+    pass
 
 class CustomRunner(ReportRunner):
     results_loader = CustomResults
+    resultset_loader = CustomResultSet
+    result_loader = CustomResult
 
     def process_results(self, results, show_colors=False):
         data = self.results_loader(self, results, show_colors)

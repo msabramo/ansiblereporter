@@ -346,7 +346,7 @@ class Result(SortedDict):
         FAILED: command failed
         """
         if self.status == 'ok':
-            return 'sucecss'
+            return 'success'
 
         elif self.status in ( 'failed', 'error', ):
             return 'FAILED'
@@ -400,13 +400,16 @@ class ResultSet(list):
     Each result is loaded with class attribute result_loader which defaults
     to Result.
     """
-    result_loader = Result
 
-    def __init__(self, runner, name):
+    def __init__(self, resultset, name):
         self.log = Logger().default_stream
-        self.runner = runner
+        self.resultset = resultset
         self.name = name
         self.ansible_facts = {}
+
+    @property
+    def result_loader(self):
+        return self.resultset.runner.result_loader
 
     def append(self, host, result):
         """Append a result
@@ -442,8 +445,6 @@ class ResultList(object):
     Note: a host may be in both sets if it was unreachable in middle of a playbook
     """
 
-    resultset_loader = ResultSet
-
     def __init__(self, runner, show_colors=False):
         self.log = Logger().default_stream
         self.runner = runner
@@ -453,6 +454,11 @@ class ResultList(object):
             'contacted': self.resultset_loader(self, 'contacted'),
             'dark': self.resultset_loader(self, 'dark'),
         }
+
+
+    @property
+    def resultset_loader(self):
+        return self.runner.resultset_loader
 
     def sort(self):
         """Sort results
@@ -517,8 +523,6 @@ class RunnerResults(ResultList):
 
     """
 
-    resultset_loader = ResultSet
-
     def __init__(self, runner, results, show_colors=False):
         ResultList.__init__(self, runner, show_colors)
 
@@ -535,8 +539,6 @@ class PlaybookResults(ResultList, AggregateStats):
     Collect results from playbook runs, grouped by host
 
     """
-
-    resultset_loader = ResultSet
 
     def __init__(self, runner, show_colors=False):
         AggregateStats.__init__(self)
@@ -653,7 +655,9 @@ class ReportRunner(Runner):
     Run ansible command and collect results for processing
 
     """
-    results_loader =  RunnerResults
+    resultlist_loader =  RunnerResults
+    resultset_loader = ResultSet
+    result_loader = Result
 
     def __init__(self, *args, **kwargs):
         self.show_colors = kwargs.pop('show_colors', False)
@@ -676,7 +680,7 @@ class ReportRunner(Runner):
         Default implementation just sorts the results. Override to
         do more fancy processing.
         """
-        return self.results_loader(self, results, show_colors)
+        return self.resultlist_loader(self, results, show_colors)
 
 
 class PlaybookRunner(PlayBook):
@@ -685,13 +689,15 @@ class PlaybookRunner(PlayBook):
     Run ansible playbook and collect results for processing
 
     """
-    results_loader = PlaybookResults
+    resultlist_loader = PlaybookResults
+    resultset_loader = ResultSet
+    result_loader = Result
 
     def __init__(self, *args, **kwargs):
         self.show_colors = kwargs.pop('show_colors', False)
         self.show_facts = kwargs.pop('show_facts', False)
 
-        self.results = results_loader(self, self.show_colors)
+        self.results = self.resultlist_loader(self, self.show_colors)
         self.callbacks = PlaybookCallbacks()
         self.runner_callbacks = PlaybookRunnerCallbacks(self.results)
 
