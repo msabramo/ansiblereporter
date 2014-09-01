@@ -16,8 +16,8 @@ except ImportError:
         sys.path.insert(0, BASE_DIR)
     from ansiblereporter import __version__
 
-from ansiblereporter import ReportRunnerError
-from ansiblereporter.cli import RunnerScript, create_directory
+from ansiblereporter import RunnerError
+from ansiblereporter.cli import AnsibleScript, create_directory
 
 def result_formatter(result):
     output = ''
@@ -43,7 +43,7 @@ def result_formatter_json(result):
     return result.to_json()
 
 
-script = RunnerScript()
+script = AnsibleScript()
 script.add_argument('--json', action='store_true', help='Show results in json format')
 script.add_argument('--by-host', action='store_true', help='Store results to separate files')
 script.add_argument('--output-file', help='Result output file')
@@ -51,7 +51,7 @@ script.add_argument('--output-directory', help='Result output directory')
 
 try:
     args, data = script.run()
-except ReportRunnerError, emsg:
+except RunnerError, emsg:
     script.exit(1, emsg)
 
 if args.by_host and not args.output_directory:
@@ -60,7 +60,7 @@ if args.by_host and not args.output_directory:
 if args.by_host:
     try:
         create_directory(args.output_directory)
-    except ReportRunnerError, emsg:
+    except RunnerError, emsg:
         script.exit(1, emsg)
 
     for result in data.results['contacted']:
@@ -72,7 +72,7 @@ if args.by_host:
 elif args.output_file:
     try:
         create_directory(os.path.dirname(args.output_file))
-    except ReportRunnerError, emsg:
+    except RunnerError, emsg:
         script.exit(1, emsg)
 
     data.write_to_file(args.output_file, formatter=result_formatter, json=args.json)

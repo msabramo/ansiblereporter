@@ -19,8 +19,8 @@ from ansible.constants import DEFAULT_MODULE_NAME, DEFAULT_MODULE_PATH, DEFAULT_
 from ansible.errors import AnsibleError
 from ansible.inventory import Inventory
 
-from ansiblereporter import ReportRunnerError
-from ansiblereporter.result import PlaybookRunner, ReportRunner, ReportRunnerError
+from ansiblereporter import RunnerError
+from ansiblereporter.result import PlaybookRunner, AnsibleRunner 
 
 DEFAULT_INVENTORY_PATHS = (
     os.environ.get('ANSIBLE_HOSTS', None),
@@ -53,7 +53,7 @@ def create_directory(directory):
 
     Wrapper to attempt creating directory unless it exists.
 
-    Raises ReportRunnerError if any errors happen.
+    Raises RunnerError if any errors happen.
     """
     if os.path.isdir(directory):
         logger.debug('directory already exists: %s' % directory)
@@ -62,12 +62,12 @@ def create_directory(directory):
     try:
         os.makedirs(directory)
     except IOError, (ecode, emsg):
-        raise ReportRunnerError('Error creating directory %s: %s' % (directory, emsg))
+        raise RunnerError('Error creating directory %s: %s' % (directory, emsg))
     except OSError, (ecode, emsg):
-        raise ReportRunnerError('Error creating directory %s: %s' % (directory, emsg))
+        raise RunnerError('Error creating directory %s: %s' % (directory, emsg))
 
 
-class AnsibleScript(Script):
+class GenericAnsibleScript(Script):
     """Ansible script wrapper base class
 
     Extend systematic.shell.Script (which wraps argparse.ArgumentParser) to run ansible
@@ -115,16 +115,16 @@ class AnsibleScript(Script):
         return args
 
 
-class RunnerScript(AnsibleScript):
+class AnsibleScript(GenericAnsibleScript):
     """Ansible script wrapper
 
     Extend systematic.shell.Script (which wraps argparse.ArgumentParser) to run ansible
     commands with reports.
     """
-    runner_class = ReportRunner
+    runner_class = AnsibleRunner
 
     def __init__(self, *args, **kwargs):
-        AnsibleScript.__init__(self, *args, **kwargs)
+        GenericAnsibleScript.__init__(self, *args, **kwargs)
 
         self.add_argument('-i', '--inventory', default=find_inventory(), help='Inventory path')
         self.add_argument('-m', '--module', default=DEFAULT_MODULE_NAME, help='Ansible module name')
@@ -146,7 +146,7 @@ class RunnerScript(AnsibleScript):
     def run(self):
         """Parse arguments and run ansible command
 
-        Parse provided arguments and run the ansible command with ansiblereporter.result.ReportRunner.run()
+        Parse provided arguments and run the ansible command with ansiblereporter.result.AnsibleRunner.run()
         """
         args = self.parse_args()
 
@@ -173,10 +173,10 @@ class RunnerScript(AnsibleScript):
         try:
             return args, self.runner.run()
         except AnsibleError, emsg:
-            raise ReportRunnerError(emsg)
+            raise RunnerError(emsg)
 
 
-class PlaybookScript(AnsibleScript):
+class PlaybookScript(GenericAnsibleScript):
     """Playbook runner wrapper
 
     Extend systematic.shell.Script (which wraps argparse.ArgumentParser) to run ansible
@@ -185,7 +185,7 @@ class PlaybookScript(AnsibleScript):
     runner_class = PlaybookRunner
 
     def __init__(self, *args, **kwargs):
-        AnsibleScript.__init__(self, *args, **kwargs)
+        GenericAnsibleScript.__init__(self, *args, **kwargs)
 
         self.add_argument('-i', '--inventory', default=find_inventory(), help='Inventory path')
         self.add_argument('-M', '--module-path', default=DEFAULT_MODULE_PATH, help='Ansible module path')
@@ -242,4 +242,4 @@ class PlaybookScript(AnsibleScript):
         try:
             return args, self.runner.run()
         except AnsibleError, emsg:
-            raise ReportRunnerError(emsg)
+            raise RunnerError(emsg)

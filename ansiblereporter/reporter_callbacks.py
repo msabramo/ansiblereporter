@@ -10,7 +10,7 @@ debug logging.
 from ansible import utils
 from ansible import callbacks
 
-from ansiblereporter import SortedDict, ReportRunnerError
+from ansiblereporter import SortedDict, RunnerError
 from systematic.log import Logger
 
 AggregateStats = callbacks.AggregateStats
@@ -94,7 +94,7 @@ class PlaybookCallbacks(callbacks.PlaybookCallbacks):
         self.log.debug('playbook start play %s' % name)
 
     def on_no_hosts_matched(self):
-        raise ReportRunnerError('No hosts matched')
+        raise RunnerError('No hosts matched')
 
     def on_stats(self, stats):
         self.log.debug('playbook statistics %s' % stats)

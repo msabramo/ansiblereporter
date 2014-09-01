@@ -12,7 +12,7 @@ reporter, how to parse custom result entry somehow and how to use process_result
 in the result runner.
 
 Please note that normally you don't need to replace the whole stack like here, just
-implement whatever you need in the customized ReportRunner.process_results method.
+implement whatever you need in the customized AnsibleRunner.process_results method.
 """
 
 import os
@@ -27,10 +27,9 @@ except ImportError:
         sys.path.insert(0, BASE_DIR)
     from ansiblereporter import __version__
 
-from ansiblereporter import ReportRunnerError
-from ansiblereporter.cli import RunnerScript, create_directory
-
-from ansiblereporter.result import ReportRunner, RunnerResults, ResultList, ResultSet, Result
+from ansiblereporter import RunnerError
+from ansiblereporter.cli import AnsibleScript, create_directory
+from ansiblereporter.result import AnsibleRunner, RunnerResults, ResultList, ResultSet, Result
 
 class CustomResult(Result):
     def __init__(self, *args, **kwargs):
@@ -51,7 +50,7 @@ class CustomResultSet(ResultSet):
 class CustomResults(RunnerResults):
     pass
 
-class CustomRunner(ReportRunner):
+class CustomRunner(AnsibleRunner):
     results_loader = CustomResults
     resultset_loader = CustomResultSet
     result_loader = CustomResult
@@ -68,14 +67,14 @@ class CustomRunner(ReportRunner):
 
         return data
 
-class CustomScript(RunnerScript):
+class CustomScript(AnsibleScript):
     runner_class = CustomRunner
 
 script = CustomScript()
 
 try:
     args, data = script.run()
-except ReportRunnerError, emsg:
+except RunnerError, emsg:
     script.exit(1, emsg)
 
 for r in data.results['contacted']:

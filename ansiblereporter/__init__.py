@@ -7,7 +7,7 @@ from systematic.log import Logger
 __version__ = '1.0'
 
 
-class ReportRunnerError(Exception): pass
+class RunnerError(Exception): pass
 
 
 class SortedDict(dict):

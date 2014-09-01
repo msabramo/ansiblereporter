@@ -11,7 +11,7 @@ from ansible.runner import Runner
 from seine.address import IPv4Address
 from systematic.log import Logger
 
-from ansiblereporter import SortedDict, ReportRunnerError
+from ansiblereporter import SortedDict, RunnerError
 from ansiblereporter.reporter_callbacks import AggregateStats, PlaybookCallbacks, PlaybookRunnerCallbacks
 
 
@@ -78,7 +78,7 @@ class Result(SortedDict):
             try:
                 value = datetime.strptime(value, RESULT_DATE_FORMAT)
             except ValueError:
-                raise ReportRunnerError('Error parsing %w date value %s' (key, value))
+                raise RunnerError('Error parsing %w date value %s' (key, value))
         else:
             return None
 
@@ -362,7 +362,7 @@ class Result(SortedDict):
 
         Callback is used for formatting of the text in the file.
 
-        Raises ReportRunnerError if file writing failed.
+        Raises RunnerError if file writing failed.
         """
         filename = os.path.join(directory, '%s.%s' % (self.host, extension))
         self.log.debug('writing to %s' % filename)
@@ -371,9 +371,9 @@ class Result(SortedDict):
             open(filename, 'w').write('%s\n' % formatter(self))
 
         except IOError, (ecode, emsg):
-            raise ReportRunnerError('Error writing file %s: %s' % (filename, emsg))
+            raise RunnerError('Error writing file %s: %s' % (filename, emsg))
         except OSError, (ecode, emsg):
-            raise ReportRunnerError('Error writing file %s: %s' % (filename, emsg))
+            raise RunnerError('Error writing file %s: %s' % (filename, emsg))
 
 
     def format(self, callback):
@@ -492,11 +492,11 @@ class ResultList(object):
 
         Either formatter callback or json=True is required
 
-        Raises ReportRunnerError if file writing failed.
+        Raises RunnerError if file writing failed.
         """
 
         if not formatter and not json:
-            raise ReportRunnerError('Either formatter callback or json flag must be set')
+            raise RunnerError('Either formatter callback or json flag must be set')
 
         try:
             fd = open(filename, 'w')
@@ -511,9 +511,9 @@ class ResultList(object):
             fd.close()
 
         except IOError, (ecode, emsg):
-            raise ReportRunnerError('Error writing file %s: %s' % (filename, emsg))
+            raise RunnerError('Error writing file %s: %s' % (filename, emsg))
         except OSError, (ecode, emsg):
-            raise ReportRunnerError('Error writing file %s: %s' % (filename, emsg))
+            raise RunnerError('Error writing file %s: %s' % (filename, emsg))
 
 
 class RunnerResults(ResultList):
@@ -623,11 +623,11 @@ class PlaybookResults(ResultList, AggregateStats):
 
         Either formatter callback or json=True is required
 
-        Raises ReportRunnerError if file writing failed.
+        Raises RunnerError if file writing failed.
         """
 
         if not formatter and not json:
-            raise ReportRunnerError('Either formatter callback or json flag must be set')
+            raise RunnerError('Either formatter callback or json flag must be set')
 
         try:
             fd = open(filename, 'w')
@@ -645,11 +645,11 @@ class PlaybookResults(ResultList, AggregateStats):
             fd.close()
 
         except IOError, (ecode, emsg):
-            raise ReportRunnerError('Error writing file %s: %s' % (filename, emsg))
+            raise RunnerError('Error writing file %s: %s' % (filename, emsg))
         except OSError, (ecode, emsg):
-            raise ReportRunnerError('Error writing file %s: %s' % (filename, emsg))
+            raise RunnerError('Error writing file %s: %s' % (filename, emsg))
 
-class ReportRunner(Runner):
+class AnsibleRunner(Runner):
     """Ansible Runner reporter
 
     Run ansible command and collect results for processing
