@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+"""
+Example script that shows how to run specific commands, just passing host
+pattern, and how to process the results with iterator.
+
+Please note it's necessary to pass all AnsibleRunner child class attributes
+(results_loader, resultset_loader and result_loader) if you need to modify
+any of them.
+
+In this example we run 'getent passwd' on each host and then on local host
+parse the resulting entries, giving a summary of users with different shells
+on each host.
+"""
+
+import os
+import sys
+
+try:
+    from ansiblereporter import __version__
+except ImportError:
+    BASE_DIR = os.sep.join(os.path.realpath(__file__).split(os.sep)[:-2])
+    moduledir = os.path.join(BASE_DIR, 'ansiblereporter')
+    if os.path.isdir(moduledir):
+        sys.path.insert(0, BASE_DIR)
+    from ansiblereporter import __version__
+
+from ansible.constants import DEFAULT_PATTERN
+
+from ansiblereporter import RunnerError
+from ansiblereporter.cli import AnsibleScript, GenericAnsibleScript, create_directory
+from ansiblereporter.result import AnsibleRunner, RunnerResults, ResultSet, Result
+
+class SSHConfigLines(Result):
+    def __init__(self, *args, **kwargs):
+        Result.__init__(self, *args, **kwargs)
+
+    @property
+    def accounts(self):
+        entries = []
+        for l in self.stdout.splitlines():
+            fields = l.split(':')
+
+            entries.append({
+                'username': fields[0],
+                'password': fields[1],
+                'uid': fields[2],
+                'gid': fields[3],
+                'gecos': fields[4],
+                'home': fields[5],
+                'shell': fields[6]
+            })
+
+        return entries
+
+    def match(self, callback):
+        return [x for x in self.accounts if callback(x)]
+
+class CustomRunner(AnsibleRunner):
+    results_loader = RunnerResults
+    resultset_loader = ResultSet
+    result_loader = SSHConfigLines
+
+class CustomScript(AnsibleScript):
+    runner_class = CustomRunner
+
+    def __init__(self, *args, **kwargs):
+        GenericAnsibleScript.__init__(self, *args, **kwargs)
+        self.add_common_arguments()
+        self.add_argument('pattern', default=DEFAULT_PATTERN, help='Ansible host pattern')
+
+    def parse_args(self):
+        args = AnsibleScript.parse_args(self)
+        args.module = 'shell'
+        args.args = 'getent passwd'
+        return args
+
+script = CustomScript()
+
+try:
+    args = script.parse_args()
+    data = script.run(args)
+except RunnerError, emsg:
+    script.exit(1, emsg)
+
+for result in data.results['contacted']:
+    if result.status == 'ok':
+        print result, result.status
+        for entry in result.match(lambda x: x['shell'] == '/bin/bash'):
+            print '%(username)s %(home)s' % entry
+
+    else:
+        print result, result.status
+        for k,v in result.items():
+            print k,v
+

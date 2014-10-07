@@ -1,0 +1,8 @@
+
+- name: Test playbook
+  hosts: localhost
+  gather_facts: true
+
+  tasks:
+  - name: Collect uname -m
+    command: uname -a

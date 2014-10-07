@@ -60,7 +60,8 @@ script.add_argument('--output-file', help='Result output file')
 script.add_argument('--output-directory', help='Result output directory')
 
 try:
-    args, data = script.run()
+    args = script.parse_args()
+    data = script.run(args)
 except RunnerError, emsg:
     script.exit(1, emsg)
 

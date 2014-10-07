@@ -127,9 +127,11 @@ class AnsibleScript(GenericAnsibleScript):
 
     def __init__(self, *args, **kwargs):
         GenericAnsibleScript.__init__(self, *args, **kwargs)
+        self.add_common_arguments()
+        self.add_default_arguments()
 
+    def add_common_arguments(self):
         self.add_argument('-i', '--inventory', default=find_inventory(), help='Inventory path')
-        self.add_argument('-m', '--module', default=DEFAULT_MODULE_NAME, help='Ansible module name')
         self.add_argument('-M', '--module-path', default=DEFAULT_MODULE_PATH, help='Ansible module path')
         self.add_argument('-T', '--timeout', type=int, default=DEFAULT_TIMEOUT, help='Response timeout')
         self.add_argument('-u', '--user', default=active_user, help='Remote user')
@@ -141,19 +143,18 @@ class AnsibleScript(GenericAnsibleScript):
         self.add_argument('-s','--sudo', action='store_true', help='run operations with sudo (nopasswd)')
         self.add_argument('-k', '--ask-pass', action='store_true', help='Ask for SSH password')
         self.add_argument('-K', '--ask-sudo-pass', action='store_true', help='Ask for sudo password')
-        self.add_argument('-a', '--args', default=DEFAULT_MODULE_ARGS, help='Module arguments')
         self.add_argument('-c', '--colors', action='store_true', help='Show output with colors')
+
+    def add_default_arguments(self):
+        self.add_argument('-m', '--module', default=DEFAULT_MODULE_NAME, help='Ansible module name')
+        self.add_argument('-a', '--args', default=DEFAULT_MODULE_ARGS, help='Module arguments')
         self.add_argument('pattern', default=DEFAULT_PATTERN, help='Ansible host pattern')
 
-    def run(self):
-        """Parse arguments and run ansible command
+    def parse_args(self):
+        return GenericAnsibleScript.parse_args(self)
 
-        Parse provided arguments and run the ansible command with ansiblereporter.result.AnsibleRunner.run()
-        """
-        args = self.parse_args()
-
-        self.log.debug('runner with %s%s args %s' % (self.mode, args.module, args.args))
-        self.runner = self.runner_class(
+    def run(self, args):
+        runner = self.runner_class(
             host_list=os.path.realpath(args.inventory),
             module_path=args.module_path,
             module_name=args.module,
@@ -173,7 +174,7 @@ class AnsibleScript(GenericAnsibleScript):
         )
 
         try:
-            return args, self.runner.run()
+            return runner.run()
         except AnsibleError, emsg:
             raise RunnerError(emsg)
 
@@ -206,14 +207,15 @@ class PlaybookScript(GenericAnsibleScript):
         self.add_argument('--show-facts', action='store_true', help='Show ansible facts in results')
         self.add_argument('playbook', help='Ansible playbook path')
 
-    def run(self):
+    def parse_args(self):
         """Parse arguments and run playbook
 
         Parse provided arguments and run the playbook with ansiblereporter.result.PlaybookRunner.run()
         """
-        args = self.parse_args()
+        return GenericAnsibleScript.parse_args(self)
 
-        self.runner = self.runner_class(
+    def run(self, args):
+        runner = self.runner_class(
             playbook=args.playbook,
             host_list=os.path.realpath(args.inventory),
             module_path=args.module_path,
@@ -242,6 +244,6 @@ class PlaybookScript(GenericAnsibleScript):
         )
 
         try:
-            return args, self.runner.run()
+            return runner.run()
         except AnsibleError, emsg:
             raise RunnerError(emsg)

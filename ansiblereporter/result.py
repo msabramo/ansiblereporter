@@ -40,7 +40,10 @@ class Result(SortedDict):
         self.update(**data)
 
     def __repr__(self):
-        return ' '.join([self.host, self.status, self.end.strftime('%Y-%m-%d %H:%M:%S')])
+        if 'end' in self:
+            return ' '.join([self.host, self.status, self.end.strftime('%Y-%m-%d %H:%M:%S')])
+        else:
+            return ' '.join([self.host, self.status])
 
     def __set_cached_property__(self, key, value):
         """Set cached property value
@@ -649,6 +652,7 @@ class PlaybookResults(ResultList, AggregateStats):
         except OSError, (ecode, emsg):
             raise RunnerError('Error writing file %s: %s' % (filename, emsg))
 
+
 class AnsibleRunner(Runner):
     """Ansible Runner reporter
 
@@ -663,13 +667,13 @@ class AnsibleRunner(Runner):
         self.show_colors = kwargs.pop('show_colors', False)
         Runner.__init__(self, *args, **kwargs)
 
-    def run(self, *args, **kwargs):
+    def run(self):
         """Run ansible command and process results
 
         Run ansible command, returning output processed with
         self.process_results.
         """
-        results = Runner.run(self, *args, **kwargs)
+        results = Runner.run(self)
         return self.process_results(results, show_colors=self.show_colors)
 
     def process_results(self, results, show_colors=False):
@@ -706,13 +710,13 @@ class PlaybookRunner(PlayBook):
         kwargs['stats'] = self.results
         PlayBook.__init__(self, *args, **kwargs)
 
-    def run(self, *args, **kwargs):
+    def run(self):
         """Run playbook
 
         Runs playbook and collects output to self.results
 
         """
-        stats = PlayBook.run(self, *args, **kwargs)
+        stats = PlayBook.run(self)
         return self.process_results(self.results)
 
     def process_results(self, results):
