@@ -1,4 +1,5 @@
-"""Script wrappers for ansible commands and PlaybookScript
+"""
+Script wrappers for ansible commands and PlaybookScript
 
 Wrap calling of ansible commands and playbooks to a script, extending
 systematic.shell.Script classes.
@@ -20,7 +21,8 @@ from ansible.errors import AnsibleError
 from ansible.inventory import Inventory
 
 from ansiblereporter import RunnerError
-from ansiblereporter.result import PlaybookRunner, AnsibleRunner 
+from ansiblereporter.result import PlaybookRunner, AnsibleRunner
+
 
 DEFAULT_INVENTORY_PATHS = (
     os.environ.get('ANSIBLE_HOSTS', None),

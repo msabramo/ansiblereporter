@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test ansible report runner
+Run ansible playbook and report results
 """
 
 import os
@@ -18,6 +18,17 @@ except ImportError:
 
 from ansiblereporter import RunnerError
 from ansiblereporter.cli import PlaybookScript, create_directory
+
+
+USAGE = """Run ansible playbook with parsable output from rules
+
+This wrapper script runs a playbook, collecting results from each target
+host and only reporting results after everything has been finished.
+
+The results can be formatted on screen, grouped by host and formatted in json,
+or written to files in given output directory.
+"""
+
 
 def result_formatter(result,):
     output = ''
@@ -50,7 +61,7 @@ def result_formatter_json(result):
     return result.to_json()
 
 
-script = PlaybookScript()
+script = PlaybookScript(description=USAGE)
 script.add_argument('--json', action='store_true', help='Show results in json format')
 script.add_argument('--by-host', action='store_true', help='Store results to separate files')
 script.add_argument('--output-file', help='Result output file')
@@ -58,7 +69,7 @@ script.add_argument('--output-directory', help='Result output directory')
 
 try:
     args, data = script.run()
-except eportRunnerError, emsg:
+except RunnerError, emsg:
     script.exit(1, emsg)
 
 if args.by_host and not args.output_directory:

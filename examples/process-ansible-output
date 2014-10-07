@@ -32,30 +32,61 @@ from ansiblereporter.cli import AnsibleScript, create_directory
 from ansiblereporter.result import AnsibleRunner, RunnerResults, ResultList, ResultSet, Result
 
 class CustomResult(Result):
-    def __init__(self, *args, **kwargs):
-        Result.__init__(self, *args, **kwargs)
+    """Filtered ansible result
 
-        self.filtered_lines = []
-        for l in self.stdout.splitlines():
-            if l.startswith('#'):
-                continue
-            self.filtered_lines.append(l)
+    Extend ansiblereport.result.Result with custom property to return
+    output lines which do not start with # character.
+    """
+    @property
+    def filtered_lines(self):
+        """Return filtered lines
+
+        Return lines from self.stdout which do not start with # letter - not
+        with an iterator, but at least only parsing the lines when requested
+        not when loading objects.
+        """
+        return [l for l in self.stdout.splitlines() if not l.startswith('#')]
 
     def __repr__(self):
-        return 'custom result %s' % Result.__repr__(self)
+        return 'filtered custom result %s' % Result.__repr__(self)
+
 
 class CustomResultSet(ResultSet):
     pass
 
+
 class CustomResults(RunnerResults):
     pass
 
+
 class CustomRunner(AnsibleRunner):
+    """Extend AnsibleRunner with custom loaders
+
+    This example shows how you can extend result parsing by providing
+    custom result, resultset and result loaders to the class.
+
+    Please note only self.result_loader actually modifies the default
+    class behaviour.
+    """
     results_loader = CustomResults
     resultset_loader = CustomResultSet
     result_loader = CustomResult
 
     def process_results(self, results, show_colors=False):
+        """Example runner callback
+
+        AnsibleRunner and AnsiblePlaybookRunner run methods call this
+        callback with ready results when the ansible command / playbook
+        is finished.
+
+        This hook can be used for post processing of the data received.
+        In this example:
+        - the command is executed in default self.run()
+        - using self.results_loader the data is loaded to result sets
+          (CustomResultSet) which contain CustomResult objects
+        - results are available from data dictionaries and could be further
+          preprocessed by this function
+        """
         data = self.results_loader(self, results, show_colors)
 
         # Do something here for the loaded CustomResults entries
@@ -67,18 +98,31 @@ class CustomRunner(AnsibleRunner):
 
         return data
 
+
 class CustomScript(AnsibleScript):
+    """Example caller for custom ansible script
+
+    This custom wrapper is required to correct setup CustomRunner entry
+    for AnsibleScript instance. There is normally no need to modify any
+    local methods of AnsibleRunner class here.
+    """
     runner_class = CustomRunner
 
+
+# Create custom ansible script with our CustomRunner class as parser
 script = CustomScript()
 
+# Try running the ansible commands
 try:
     args, data = script.run()
 except RunnerError, emsg:
     script.exit(1, emsg)
 
+# Show results from contacted hosts with the filtered lines function
 for r in data.results['contacted']:
     print r.state, r, type(r)
-    for l in r.filtered_lines:
-        print l
-
+    if r.status == 'ok':
+        for l in r.filtered_lines:
+            print l
+    else:
+        print 'ERROR MESSAGE', r.stderr

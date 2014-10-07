@@ -19,6 +19,16 @@ except ImportError:
 from ansiblereporter import RunnerError
 from ansiblereporter.cli import AnsibleScript, create_directory
 
+USAGE = """Run ansible command with parsable output
+
+This wrapper runs a command with ansible, collecting results from the commands
+on each host and writing output to screen after all commands are finished.
+
+By default the command outputs (mostly) ansible compatible output, but making sure
+output from each host is printed in order. You can also dump the results in json or
+write them to output files.
+"""
+
 def result_formatter(result):
     output = ''
 
@@ -43,7 +53,7 @@ def result_formatter_json(result):
     return result.to_json()
 
 
-script = AnsibleScript()
+script = AnsibleScript(description=USAGE)
 script.add_argument('--json', action='store_true', help='Show results in json format')
 script.add_argument('--by-host', action='store_true', help='Store results to separate files')
 script.add_argument('--output-file', help='Result output file')
