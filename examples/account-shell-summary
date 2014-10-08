@@ -30,7 +30,7 @@ from ansiblereporter import RunnerError
 from ansiblereporter.cli import AnsibleScript, GenericAnsibleScript, create_directory
 from ansiblereporter.result import AnsibleRunner, RunnerResults, ResultSet, Result
 
-class SSHConfigLines(Result):
+class UserEntryResult(Result):
     def __init__(self, *args, **kwargs):
         Result.__init__(self, *args, **kwargs)
 
@@ -58,7 +58,7 @@ class SSHConfigLines(Result):
 class CustomRunner(AnsibleRunner):
     results_loader = RunnerResults
     resultset_loader = ResultSet
-    result_loader = SSHConfigLines
+    result_loader = UserEntryResult 
 
 class CustomScript(AnsibleScript):
     runner_class = CustomRunner
