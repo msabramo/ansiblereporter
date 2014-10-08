@@ -15,15 +15,6 @@ on each host.
 import os
 import sys
 
-try:
-    from ansiblereporter import __version__
-except ImportError:
-    BASE_DIR = os.sep.join(os.path.realpath(__file__).split(os.sep)[:-2])
-    moduledir = os.path.join(BASE_DIR, 'ansiblereporter')
-    if os.path.isdir(moduledir):
-        sys.path.insert(0, BASE_DIR)
-    from ansiblereporter import __version__
-
 from ansible.constants import DEFAULT_PATTERN
 
 from ansiblereporter import RunnerError
