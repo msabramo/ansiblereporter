@@ -1,0 +1,11 @@
+
+- name: Check host status
+  hosts: hima
+  gather_facts: true
+
+  tasks:
+  - name: Collect uname -m
+    command: uname -a
+
+  - name: Check uptime
+    command: uptime

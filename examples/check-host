@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+"""
+Run ansible playbook and report results
+"""
+
+import os
+import sys
+from termcolor import colored, cprint
+
+try:
+    from ansiblereporter import __version__
+except ImportError:
+    BASE_DIR = os.sep.join(os.path.realpath(__file__).split(os.sep)[:-2])
+    moduledir = os.path.join(BASE_DIR, 'ansiblereporter')
+    if os.path.isdir(moduledir):
+        sys.path.insert(0, BASE_DIR)
+    from ansiblereporter import __version__
+
+from ansiblereporter import RunnerError
+from ansiblereporter.cli import PlaybookScript, GenericAnsibleScript, create_directory
+
+class CheckHostScript(PlaybookScript):
+    def __init__(self, *args, **kwargs):
+        GenericAnsibleScript.__init__(self, *args, **kwargs)
+        self.add_common_arguments()
+
+    def parse_args(self):
+        args = PlaybookScript.parse_args(self)
+        args.playbook = '%s.yml' % os.path.realpath(__file__)
+        return args
+
+script = CheckHostScript()
+script.add_argument('--json', action='store_true', help='Show results in json format')
+script.add_argument('--by-host', action='store_true', help='Store results to separate files')
+script.add_argument('--output-file', help='Result output file')
+script.add_argument('--output-directory', help='Result output directory')
+
+try:
+    args = script.parse_args()
+    data = script.run(args)
+except RunnerError, emsg:
+    script.exit(1, emsg)
+
+for entry in data.grouped_by_host['contacted']:
+    print entry['host']
+    for result in entry['results']:
+        print '### Command %s' %  result.module_args
+        if result.status == 'ok':
+            print result.stdout
+        else:
+            print result.error
