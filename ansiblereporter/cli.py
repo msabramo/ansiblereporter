@@ -189,7 +189,10 @@ class PlaybookScript(GenericAnsibleScript):
 
     def __init__(self, *args, **kwargs):
         GenericAnsibleScript.__init__(self, *args, **kwargs)
+        self.add_common_arguments()
+        self.add_argument('playbook', help='Ansible playbook path')
 
+    def add_common_arguments(self):
         self.add_argument('-i', '--inventory', default=find_inventory(), help='Inventory path')
         self.add_argument('-M', '--module-path', default=DEFAULT_MODULE_PATH, help='Ansible module path')
         self.add_argument('-T', '--timeout', type=int, default=DEFAULT_TIMEOUT, help='Response timeout')
@@ -205,7 +208,6 @@ class PlaybookScript(GenericAnsibleScript):
         self.add_argument('-a', '--args', default=DEFAULT_MODULE_ARGS, help='Module arguments')
         self.add_argument('-c', '--colors', action='store_true', help='Show output with colors')
         self.add_argument('--show-facts', action='store_true', help='Show ansible facts in results')
-        self.add_argument('playbook', help='Ansible playbook path')
 
     def parse_args(self):
         """Parse arguments and run playbook

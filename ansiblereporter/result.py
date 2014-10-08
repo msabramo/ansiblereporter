@@ -356,6 +356,9 @@ class Result(SortedDict):
 
         return self.status
 
+    def copy(self):
+        return Result(self.resultset, self.host, self)
+
     def write_to_directory(self, directory, formatter, extension):
         """Write file to directory with formatter callback
 
@@ -377,7 +380,6 @@ class Result(SortedDict):
             raise RunnerError('Error writing file %s: %s' % (filename, emsg))
         except OSError, (ecode, emsg):
             raise RunnerError('Error writing file %s: %s' % (filename, emsg))
-
 
     def format(self, callback):
         """Format data
