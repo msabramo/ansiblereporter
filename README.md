@@ -16,20 +16,23 @@ Installing
 Run one of following to install these tools:
 
     make install
+
     PREFIX=/usr/local make install
 
 Included commands
 =================
 
-./bin/ansible-reporter
-  Run single ansible command with options to output data to files, either with
-  default formatter or as json formatted results. With no options results are
-  collected and reported to stdout in mostly ansible compatible text output.
+ansible-reporter
 
-./bin/ansible-playbook-reporter
-  Run ansible playbook with similar options to output data from playbook steps
-  to files as ansible-reporter. The output differs from playbook output, because
-  for each host output from each ansible playbook task is reported fully.
+Run single ansible command with options to output data to files, either with
+default formatter or as json formatted results. With no options results are
+collected and reported to stdout in mostly ansible compatible text output.
+
+ansible-playbook-reporter
+
+Run ansible playbook with similar options to output data from playbook steps
+to files as ansible-reporter. The output differs from playbook output, because
+for each host output from each ansible playbook task is reported fully.
 
 Example data parsers
 ====================
