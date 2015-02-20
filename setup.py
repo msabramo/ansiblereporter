@@ -4,7 +4,7 @@ import glob
 
 from setuptools import setup, find_packages
 
-VERSION='1.1'
+VERSION='1.2'
 
 setup(
     name = 'ansiblereporter',
