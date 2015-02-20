@@ -5,7 +5,6 @@ import glob
 from setuptools import setup, find_packages
 
 VERSION='1.0'
-README = open(os.path.join(os.path.dirname(__file__),'README.md'),'r').read()
 
 setup(
     name = 'ansiblereporter',
@@ -13,17 +12,16 @@ setup(
     description = 'Scripts for ansible to report host output data',
     author = 'Ilkka Tuohela',
     author_email = 'hile@iki.fi',
-    long_description = README,
     version = VERSION,
     url = 'http://tuohela.net/packages/ansiblereporter',
     license = 'PSF',
-    zip_safe = False,
     packages = find_packages(),
     scripts = glob.glob('bin/*'),
     install_requires = (
-        'ansible>=1.7.1',
-        'systematic>=4.0.7',
-        'seine>=2.4.2',
+        'ansible>=1.8.2',
+        'boto',
+        'seine>=2.5.0',
+        'systematic>=4.2.3',
         'termcolor',
     ),
 )
