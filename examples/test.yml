@@ -1,8 +1,12 @@
 
-- name: Test playbook
-  hosts: localhost
-  gather_facts: true
+- name: Test playbook with reporting
+  hosts: test
+  gather_facts: false
 
   tasks:
-  - name: Collect uname -m
-    command: uname -a
+   - name: Collect uname -m
+     command: uname -a
+
+   - name: Run uptime
+     command: uptime 
+
