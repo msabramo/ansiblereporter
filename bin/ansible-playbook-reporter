@@ -54,9 +54,7 @@ def result_formatter_json(result):
 
 script = PlaybookScript(description=USAGE)
 script.add_argument('--json', action='store_true', help='Show results in json format')
-script.add_argument('--by-host', action='store_true', help='Store results to separate files')
 script.add_argument('--output-file', help='Result output file')
-script.add_argument('--output-directory', help='Result output directory')
 
 try:
     args = script.parse_args()
@@ -64,28 +62,16 @@ try:
 except RunnerError, emsg:
     script.exit(1, emsg)
 
-if args.by_host and not args.output_directory:
-    script.exit(1, 'Argument --by-host requires output directory')
-
-if args.by_host:
-    try:
-        create_directory(args.output_directory)
-    except RunnerError, emsg:
-        script.exit(1, emsg)
-
-    for result in data.results['contacted']:
-        if args.json:
-            result.write_to_directory(args.output_directory, result_formatter_json, 'json')
-        else:
-            result.write_to_directory(args.output_directory, result_formatter, 'txt')
-
-elif args.output_file:
+if args.output_file:
     try:
         create_directory(os.path.dirname(args.output_file))
     except RunnerError, emsg:
         script.exit(1, emsg)
 
-    data.write_to_file(args.output_file, formatter=result_formatter, json=args.json)
+    if args.json:
+        data.write_to_file(args.output_file, formatter=result_formatter_json, json=args.json)
+    else:
+        data.write_to_file(args.output_file, formatter=result_formatter, json=args.json)
 
 else:
     if args.json:
