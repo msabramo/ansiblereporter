@@ -1,21 +1,36 @@
 #!/usr/bin/env python
 
+import os
+import re
+
 from systematic.shell import Script, ScriptCommand
-from ansible.inventory import Inventory
-from ansible.inventory.group import Group
+from ansiblereporter.inventory import Inventory, InventoryError
+
 
 class InventoryCommand(ScriptCommand):
+
+    def ns_sort_items(self, values):
+        convert = lambda v: int(v) if v.isdigit() else v.lower()
+        alphanum_key = lambda entry: [convert(c) for c in re.split('([0-9]+)', entry.name) ]
+        return sorted(values, key=alphanum_key)
 
     @property
     def groups(self):
         groups = [g for g in self.inventory.get_groups() if g.name != 'all']
-        groups.sort(lambda a, b: cmp(a.name, b.name))
-        return groups
+        return self.ns_sort_items(groups)
 
     def parse_args(self, args):
-        self.inventory = Inventory()
+        try:
+            if args.inventory:
+                self.inventory = Inventory(os.path.expanduser(os.path.expandvars(args.inventory)))
+            else:
+                self.inventory = Inventory()
+        except InventoryError, emsg:
+            self.exit(1, emsg)
+
         if 'groups' in args and args.groups is not None:
             args.groups = [g for x in args.groups for g in x.split(',')]
+
         return args
 
 
@@ -26,6 +41,53 @@ class GroupListCommand(InventoryCommand):
             if group.name != 'ungrouped':
                 print group.name
 
+
+class GroupDeleteCommand(InventoryCommand):
+    def run(self, args):
+        args = self.parse_args(args)
+
+        if not args.inventory_path:
+            if self.inventory.is_file():
+                args.inventory_path = self.inventory.host_list
+            else:
+                self.exit(1, "Loaded inventory was not file: can't write to it")
+
+        if not args.groups:
+            self.exit(1, 'No groups to delete provided')
+
+        for name in args.groups:
+            found = False
+            for i, group in enumerate(self.inventory.groups):
+                if group.name == name:
+                    self.inventory.groups.pop(i)
+                    found = True
+                    break
+            if not found:
+                self.message('No such group: %s' % name)
+
+        self.inventory.save(args.inventory_path)
+
+
+class GroupAddCommand(InventoryCommand):
+    def run(self, args):
+        args = self.parse_args(args)
+
+        if not args.inventory_path:
+            if self.inventory.is_file():
+                args.inventory_path = self.inventory.host_list
+            else:
+                self.exit(1, "Loaded inventory was not file: can't write to it")
+
+        if not args.groups:
+            self.exit(1, 'No groups to add provided')
+
+        for group in args.groups:
+            try:
+                group = self.inventory.add_group(group)
+            except InventoryError, emsg:
+                self.message(emsg)
+
+        self.inventory.save(args.inventory_path)
 
 class HostListCommand(InventoryCommand):
     def run(self, args):
@@ -39,7 +101,7 @@ class HostListCommand(InventoryCommand):
                 continue
 
             print group.name
-            for host in sorted(hosts, lambda a, b: cmp(a.name, b.name)):
+            for host in self.ns_sort_items(hosts):
                 print '  %s' % (host.name)
 
 
@@ -67,13 +129,96 @@ class HostDetailsCommand(InventoryCommand):
                     v = ','.join(v)
                 print '  %30s %s' % (k, v)
 
+
+class HostDeleteCommand(InventoryCommand):
+    def run(self, args):
+        args = self.parse_args(args)
+
+        if not args.inventory_path:
+            if self.inventory.is_file():
+                args.inventory_path = self.inventory.host_list
+            else:
+                self.exit(1, "Loaded inventory was not file: can't write to it")
+
+        if args.group is None:
+            args.group = 'ungrouped'
+
+        group = self.inventory.get_group(args.group)
+        if group is None:
+            self.exit(1, 'Group not found: %s' % args.group)
+
+        if args.hosts:
+            args.hosts = [host for x in args.hosts for host in x.split(',')]
+        else:
+            self.exit(1, 'No hosts to add provided')
+
+        for name in args.hosts:
+            found = False
+            for i, host in enumerate(group.hosts):
+                if host.name == name:
+                    group.hosts.pop(i)
+                    found = True
+                    break
+            if not found:
+                self.message('Host not found in group %s: %s' % (group.name, name))
+
+        self.inventory.save(args.inventory_path)
+
+
+class HostAddCommand(InventoryCommand):
+    def run(self, args):
+        args = self.parse_args(args)
+
+        if not args.inventory_path:
+            if self.inventory.is_file():
+                args.inventory_path = self.inventory.host_list
+            else:
+                self.exit(1, "Loaded inventory was not file: can't write to it")
+
+        if not args.group:
+            args.group = self.inventory.get_group('ungrouped')
+
+        if args.hosts:
+            args.hosts = [host for x in args.hosts for host in x.split(',')]
+        else:
+            self.exit(1, 'No hosts to add provided')
+
+        for host in args.hosts:
+            try:
+                group = self.inventory.add_host(args.group, host)
+            except InventoryError, emsg:
+                self.message(emsg)
+
+        self.inventory.save(args.inventory_path)
+
+
 script = Script()
+script.add_argument('-i', '--inventory', help='Path to inventory')
+
 c = script.add_subcommand(GroupListCommand('list-groups', 'List ansible inventory groups'))
+
+c = script.add_subcommand(GroupDeleteCommand('delete-groups', 'Delete groups from inventory'))
+c.add_argument('--inventory-path', help='Path where new inventory is stored')
+c.add_argument('groups', nargs='*', help='Groups to delete')
+
+c = script.add_subcommand(GroupAddCommand('add-groups', 'Add empty groups to inventory'))
+c.add_argument('--inventory-path', help='Path where new inventory is stored')
+c.add_argument('groups', nargs='*', help='Groups to add')
 
 c = script.add_subcommand(HostListCommand('list-hosts', 'List ansible inventory hosts'))
 c.add_argument('groups', nargs='*', help='Only specified groups')
 
 c = script.add_subcommand(HostDetailsCommand('host-details', 'Show variables for host'))
 c.add_argument('hosts', nargs='*', help='Only specified hosts')
+
+c = script.add_subcommand(HostDeleteCommand('delete-hosts', 'Delete hosts from group'))
+c.add_argument('--inventory-path', help='Path where new inventory is stored')
+c.add_argument('--group', help='Group to delete hosts from')
+c.add_argument('hosts', nargs='*', help='Hosts to remove')
+
+c = script.add_subcommand(HostAddCommand('add-hosts', 'Add hosts to group'))
+c.add_argument('--inventory-path', help='Path where new inventory is stored')
+c.add_argument('--group', help='Group to add hosts to')
+c.add_argument('hosts', nargs='*', help='Hosts to add')
 
 args = script.parse_args()
