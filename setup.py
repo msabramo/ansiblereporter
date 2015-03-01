@@ -13,7 +13,7 @@ setup(
     author = 'Ilkka Tuohela',
     author_email = 'hile@iki.fi',
     version = VERSION,
-    url = 'http://tuohela.net/packages/ansiblereporter',
+    url = 'https://github.com/codento/ansiblereporter',
     license = 'PSF',
     packages = find_packages(),
     scripts = glob.glob('bin/*'),
@@ -25,4 +25,3 @@ setup(
         'termcolor',
     ),
 )
-
