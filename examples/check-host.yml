@@ -1,7 +1,7 @@
 
 - name: Check host status
-  hosts: hima
-  gather_facts: true
+  hosts: test
+  gather_facts: false
 
   tasks:
   - name: Collect uname -m
